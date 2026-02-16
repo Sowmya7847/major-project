@@ -6,11 +6,12 @@ const {
     rotateKey
 } = require('../controllers/keyController');
 const { protect } = require('../middleware/authMiddleware');
+const { audit } = require('../middleware/auditMiddleware');
 
 router.use(protect); // All key routes are protected
 
-router.post('/generate', generateNewKey);
+router.post('/generate', audit('GENERATE_KEY', 'critical'), generateNewKey);
 router.get('/active', getActiveKey);
-router.post('/rotate', rotateKey);
+router.post('/rotate', audit('ROTATE_KEY', 'critical'), rotateKey);
 
 module.exports = router;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, Shield, AlertTriangle, CheckCircle, Download, Search, Filter } from 'lucide-react';
+import { Activity, Shield, AlertTriangle, CheckCircle, Download, Search, Filter, Lock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { cn } from '../lib/utils';
 

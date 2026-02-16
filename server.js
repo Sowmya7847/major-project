@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/db');
+const { errorHandler } = require('./middleware/errorMiddleware');
 
 // Load env vars
 dotenv.config();
@@ -37,14 +38,7 @@ app.use('/api/security', require('./routes/securityRoutes'));
 const { initNodes } = require('./services/nodeService');
 
 // Error Handling Middleware
-app.use((err, req, res, next) => {
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    res.status(statusCode);
-    res.json({
-        message: err.message,
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-    });
-});
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 

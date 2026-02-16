@@ -7,10 +7,12 @@ const { uploadFile, downloadFile, getUserFiles, getMetrics } = require('../contr
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+const { audit } = require('../middleware/auditMiddleware');
+
 router.use(protect);
 
-router.post('/upload', upload.single('file'), uploadFile);
-router.get('/:id/download', downloadFile);
+router.post('/upload', upload.single('file'), audit('UPLOAD_FILE'), uploadFile);
+router.get('/:id/download', audit('DOWNLOAD_FILE'), downloadFile);
 router.get('/', getUserFiles);
 router.get('/metrics', getMetrics);
 

@@ -10,6 +10,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import DataSecurity from './pages/DataSecurity';
 import EncryptionControl from './pages/EncryptionControl';
 import Monitoring from './pages/Monitoring';
+import Landing from './pages/Landing';
+import Nodes from './pages/Nodes';
 
 const PrivateRoute = ({ children, adminOnly = false }) => {
   const { user, loading } = useContext(AuthContext);
@@ -30,6 +32,7 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
@@ -84,7 +87,17 @@ function App() {
               </PrivateRoute>
             }
           />
-          <Route path="*" element={<Navigate to="/login" />} />
+          <Route
+            path="/nodes"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <Nodes />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </AuthProvider>
     </Router>
