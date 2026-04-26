@@ -39,6 +39,20 @@ const getActiveKey = asyncHandler(async (req, res) => {
 // @desc    Rotate Key (Deactivate old, create new)
 // @route   POST /api/keys/rotate
 // @access  Private
+const getAllKeys = asyncHandler(async (req, res) => {
+    const keys = await Key.find({ user: req.user.id }).sort({ createdAt: -1 }).limit(20);
+    res.json(keys);
+});
+
+const getKeyStats = asyncHandler(async (req, res) => {
+    const activeCount = await Key.countDocuments({ user: req.user.id, isActive: true });
+    const rotatedCount = await Key.countDocuments({ user: req.user.id, status: 'rotated' });
+    const now = new Date();
+    const soon = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days
+    const expiringCount = await Key.countDocuments({ user: req.user.id, isActive: true, expiryDate: { $lte: soon, $gte: now } });
+    res.json({ activeCount, rotatedCount, expiringCount });
+});
+
 const rotateKey = asyncHandler(async (req, res) => {
     // Finds all active keys and deactivates them
     await Key.updateMany(
@@ -63,5 +77,7 @@ const rotateKey = asyncHandler(async (req, res) => {
 module.exports = {
     generateNewKey,
     getActiveKey,
-    rotateKey
+    rotateKey,
+    getAllKeys,
+    getKeyStats
 };

@@ -34,8 +34,14 @@ const Monitoring = () => {
                 }));
                 setAuditLogs(formattedLogs);
 
-                // Metrics
-                setMetrics(metricsRes.data);
+                setMetrics({
+                    ...metricsRes.data,
+                    trafficData: metricsRes.data.trafficData || [],
+                    throughputData: metricsRes.data.throughputData || [0,0,0,0,0,0,0],
+                    anomalyScore: metricsRes.data.anomalyScore || 0,
+                    anomalyStatus: metricsRes.data.anomalyStatus || 'Low',
+                    lastAnomalyMsg: metricsRes.data.lastAnomalyMsg || null
+                });
 
             } catch (error) {
                 console.error("Failed to fetch monitoring data:", error);
@@ -156,7 +162,11 @@ const Monitoring = () => {
                             <div className="absolute right-0 top-0 h-full bg-gray-900" style={{ width: `${100 - Math.min(100, metrics.anomalyScore * 5)}%` }}></div>
                         </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-4">Last anomaly: <strong>IP 192.168.1.45</strong> (Unauthorized access)</p>
+                    <p className="text-xs text-gray-500 mt-4">
+                        {metrics.lastAnomalyMsg
+                            ? <>Last anomaly: <strong className="text-white">{metrics.lastAnomalyMsg}</strong></>
+                            : 'No recent anomalies detected.'}
+                    </p>
                 </div>
             </div>
 

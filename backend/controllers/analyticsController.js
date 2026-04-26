@@ -61,6 +61,10 @@ const getDashboardMetrics = async (req, res) => {
         // 4. AI Insights
         const aiInsights = await geminiService.summarizeLogs(10);
 
+        // 5. Last anomaly event
+        const lastAnomaly = await AuditLog.findOne({ severity: 'critical' }).sort({ timestamp: -1 });
+        const lastAnomalyMsg = lastAnomaly ? `${lastAnomaly.eventType}: ${lastAnomaly.message?.slice(0, 60)}` : null;
+
         res.status(200).json({
             trafficData,
             throughputData,
@@ -81,6 +85,7 @@ const getDashboardMetrics = async (req, res) => {
                 status: n.status
             })),
             aiInsights,
+            lastAnomalyMsg,
             anomalyScore: metrics.criticalLogs,
             anomalyStatus: metrics.criticalLogs > 10 ? 'High' : (metrics.criticalLogs > 5 ? 'Medium' : 'Low')
         });
