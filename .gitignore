@@ -10,3 +10,20 @@ yarn-error.log
 coverage
 .DS_Store
 Thumbs.db
+
+# Large generated files
+all_keys_search.txt
+chatbot_test_output.txt
+
+# Test/debug scripts
+verify_db_atlas.js
+verify_system.js
+test_auth.js
+test_new_key.js
+backend/test_*.js
+
+# ML binary model files
+ml-service/*.pkl
+
+# Storage node binary chunks
+backend/storage_nodes/
