@@ -108,14 +108,14 @@ const Dashboard = () => {
                                 <Briefcase size={18} className="text-gray-500" />
                                 <div className="text-left">
                                     <p className="text-xs text-gray-500">Department</p>
-                                    <p className="text-sm font-medium text-gray-200">Cybersecurity Ops</p>
+                                    <p className="text-sm font-medium text-gray-200">{user?.department || 'Cybersecurity Ops'}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 p-3 bg-surfaceHover rounded-lg">
                                 <CheckCircle size={18} className="text-success" />
                                 <div className="text-left">
                                     <p className="text-xs text-gray-500">Security Score</p>
-                                    <p className="text-sm font-medium text-success">98/100 (Excellent)</p>
+                                    <p className="text-sm font-medium text-success">{user?.securityScore || 98}/100 (Excellent)</p>
                                 </div>
                             </div>
                         </div>
@@ -232,6 +232,7 @@ const Dashboard = () => {
                                     <tr>
                                         <th className="p-4 font-medium">Filename</th>
                                         <th className="p-4 font-medium">Algorithm / Policy</th>
+                                        <th className="p-4 font-medium">Status</th>
                                         <th className="p-4 font-medium">Risk Status</th>
                                         <th className="p-4 font-medium text-right">Action</th>
                                     </tr>
@@ -259,6 +260,25 @@ const Dashboard = () => {
                                                 ) : (
                                                     <span className="text-xs font-mono text-gray-400 bg-gray-900 px-2 py-1 rounded">
                                                         {file.encryptionAlgorithm}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-4">
+                                                {file.status === 'stored' ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success border border-success/20">
+                                                        Stored
+                                                    </span>
+                                                ) : file.status === 'processing' ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 animate-pulse">
+                                                        Processing
+                                                    </span>
+                                                ) : file.status === 'failed' ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-danger/10 text-danger border border-danger/20">
+                                                        Failed
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-500/10 text-gray-500 border border-gray-500/20">
+                                                        Pending
                                                     </span>
                                                 )}
                                             </td>

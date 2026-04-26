@@ -12,9 +12,12 @@ import {
     Bell,
     Search,
     User,
-    Lock
+    Lock,
+    Sun,
+    Moon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import ThemeContext from '../context/ThemeContext';
 
 const SidebarItem = ({ icon: Icon, label, path, active }) => (
     <Link
@@ -33,6 +36,7 @@ const SidebarItem = ({ icon: Icon, label, path, active }) => (
 
 const Layout = ({ children }) => {
     const { user, logout } = useContext(AuthContext);
+    const { theme, toggleTheme } = useContext(ThemeContext);
     const location = useLocation();
     const navigate = useNavigate();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -44,12 +48,16 @@ const Layout = ({ children }) => {
 
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-        { icon: Activity, label: 'Admin Console', path: '/admin' },
+        { icon: Activity, label: 'Admin Console', path: '/admin', adminOnly: true },
         { icon: Shield, label: 'Data Security', path: '/data-security' },
         { icon: Lock, label: 'Encryption Control', path: '/encryption-control' },
         { icon: Activity, label: 'Monitoring & Logs', path: '/monitoring' },
         { icon: Server, label: 'Distributed Nodes', path: '/nodes' },
+        { icon: User, label: 'Access Policies', path: '/access-policies' },
+        { icon: Settings, label: 'System Settings', path: '/system-config', adminOnly: true }
     ];
+
+    const filteredNavItems = navItems.filter(item => !item.adminOnly || user?.role === 'admin');
 
     return (
         <div className="min-h-screen bg-background text-white flex">
@@ -67,7 +75,7 @@ const Layout = ({ children }) => {
                     <div className="px-4 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         Main Menu
                     </div>
-                    {navItems.map((item) => (
+                    {filteredNavItems.map((item) => (
                         <SidebarItem
                             key={item.path + item.label}
                             {...item}
@@ -117,6 +125,12 @@ const Layout = ({ children }) => {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        <button
+                            onClick={toggleTheme}
+                            className="p-2 text-gray-400 hover:text-white transition-colors"
+                        >
+                            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                        </button>
                         <button className="relative p-2 text-gray-400 hover:text-primary transition-colors">
                             <Bell size={20} />
                             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>

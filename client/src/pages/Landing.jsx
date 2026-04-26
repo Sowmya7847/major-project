@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Shield, Lock, Activity, Globe, Server, Cpu, ChevronRight } from 'lucide-react';
+import { useContext } from 'react';
+import { Shield, Lock, Activity, Globe, Server, Cpu, ChevronRight, Sun, Moon } from 'lucide-react';
+import ThemeContext from '../context/ThemeContext';
 
 const Landing = () => {
+    const { theme, toggleTheme } = useContext(ThemeContext);
     return (
         <div className="min-h-screen bg-background text-white overflow-hidden relative selection:bg-primary/30">
             {/* Background Effects */}
@@ -21,6 +24,12 @@ const Landing = () => {
                     <span className="text-xl font-bold tracking-wider">CloudShield</span>
                 </div>
                 <div className="flex items-center gap-6">
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 text-gray-400 hover:text-white transition-colors"
+                    >
+                        {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                    </button>
                     <Link to="/login" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">Log In</Link>
                     <Link to="/register" className="px-5 py-2 bg-primary hover:bg-primaryHover text-black font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:shadow-[0_0_30px_rgba(0,229,255,0.5)]">
                         Get Started

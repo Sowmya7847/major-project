@@ -1,0 +1,15 @@
+{
+    "name": "worker-service",
+    "version": "1.0.0",
+    "description": "Encryption and AI Analysis Worker",
+    "main": "encryptionWorker.js",
+    "scripts": {
+        "start": "node encryptionWorker.js"
+    },
+    "dependencies": {
+        "mongoose": "^8.3.4",
+        "dotenv": "^16.4.5",
+        "axios": "^1.6.8",
+        "@google/generative-ai": "^0.24.1"
+    }
+}

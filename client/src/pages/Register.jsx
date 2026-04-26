@@ -76,6 +76,24 @@ const Register = () => {
                     >
                         Register
                     </button>
+
+                    <div className="relative my-4">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-gray-600"></span>
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-gray-800 px-2 text-gray-400">Or continue with</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <a href="http://localhost:4000/api/auth/google" className="flex items-center justify-center py-2 px-4 border border-gray-600 rounded hover:bg-gray-700 transition-colors text-sm">
+                            Google
+                        </a>
+                        <a href="http://localhost:4000/api/auth/microsoft" className="flex items-center justify-center py-2 px-4 border border-gray-600 rounded hover:bg-gray-700 transition-colors text-sm">
+                            Microsoft
+                        </a>
+                    </div>
                 </form>
                 <p className="mt-4 text-center text-gray-400">
                     Already have an account? <Link to="/login" className="text-blue-400 hover:underline">Login</Link>

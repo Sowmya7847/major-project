@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Shield, Lock, RefreshCw, CheckCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../lib/utils';
+import API from '../services/api';
 
 const Toggle = ({ enabled, onChange }) => (
     <button
@@ -20,24 +21,53 @@ const Toggle = ({ enabled, onChange }) => (
 );
 
 const DataSecurity = () => {
-    const [config, setConfig] = useState({
-        endToEndEncryption: true,
-        hmacVerification: true,
-        autoKeyRotation: false,
-    });
+    const [config, setConfig] = useState(null);
     const [algorithm, setAlgorithm] = useState('AES-256-GCM');
     const [inputText, setInputText] = useState('{\n  "name": "John Doe",\n  "cc": "4532-xxxx-xxxx-8899",\n  "ssn": "xxx-xx-6789"\n}');
     const [encryptedPreview, setEncryptedPreview] = useState('');
 
     useEffect(() => {
-        // Simulate encryption for preview
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        let result = "";
-        for (let i = 0; i < inputText.length * 1.5; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        setEncryptedPreview(result.match(/.{1,45}/g)?.join('\n') || '');
+        const fetchConfig = async () => {
+            try {
+                const { data } = await API.get('/security/config');
+                setConfig(data);
+                if (data.defaultAlgorithm) {
+                    setAlgorithm(data.defaultAlgorithm);
+                }
+            } catch (error) {
+                console.error("Failed to fetch security config", error);
+            }
+        };
+        fetchConfig();
+    }, []);
+
+    useEffect(() => {
+        const timeoutId = setTimeout(async () => {
+            if (!inputText) {
+                setEncryptedPreview('');
+                return;
+            }
+            try {
+                const { data } = await API.post('/security/preview-encryption', { text: inputText, algorithm });
+                setEncryptedPreview(data.encryptedText);
+            } catch (error) {
+                setEncryptedPreview('Error generating preview');
+            }
+        }, 500); // debounce 500ms
+        
+        return () => clearTimeout(timeoutId);
     }, [inputText, algorithm]);
+
+    const handleSave = async () => {
+        try {
+            await API.put('/security/config', config);
+            alert('Configuration saved successfully!');
+        } catch (error) {
+            alert('Failed to save configuration');
+        }
+    };
+
+    if (!config) return <div className="text-white p-8">Loading configuration...</div>;
 
     return (
         <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -57,7 +87,7 @@ const DataSecurity = () => {
                     <button className="px-4 py-2 bg-surface border border-gray-700 text-gray-300 rounded-lg hover:bg-surfaceHover transition-colors flex items-center gap-2 font-medium">
                         <RefreshCw size={18} /> View History
                     </button>
-                    <button className="px-4 py-2 bg-danger hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-danger/20">
+                    <button onClick={handleSave} className="px-4 py-2 bg-danger hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2 font-bold shadow-lg shadow-danger/20">
                         <Lock size={18} /> Save Configuration
                     </button>
                 </div>
@@ -143,7 +173,7 @@ const DataSecurity = () => {
                         <div>
                             <h4 className="font-bold text-white text-sm">Compliance Check</h4>
                             <p className="text-gray-400 text-sm mt-1">
-                                Configuring <span className="text-primary">AES-256</span> with <span className="text-primary">90-day</span> rotation meets
+                                Configuring <span className="text-primary">{algorithm.split('-')[0]}</span> with <span className="text-primary">{config.autoKeyRotation ? '90-day' : 'manual'}</span> rotation meets
                                 <span className="font-bold text-white"> SOC2 Type II</span> and <span className="font-bold text-white">GDPR</span> requirements.
                             </p>
                         </div>

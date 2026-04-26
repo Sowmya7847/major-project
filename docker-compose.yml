@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/securecloud
+      - JWT_SECRET=${JWT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - mongodb
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "4000:4000"
+    depends_on:
+      - backend
+
+  worker:
+    build: ./workers
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/securecloud
+      - GATEWAY_URL=http://gateway:4000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - gateway
+
+  client:
+    build: ./client
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+
+volumes:
+  mongo-data:

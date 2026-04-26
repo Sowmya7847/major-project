@@ -15,13 +15,28 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = async (email, password) => {
+    const login = async (email, password, oauthToken = null) => {
         try {
-            const { data } = await API.post('/auth/login', { email, password });
+            let data;
+
+            if (oauthToken) {
+                // OAuth Flow
+                localStorage.setItem('token', oauthToken);
+                // Fetch user data
+                const res = await API.get('/auth/me');
+                data = { ...res.data, token: oauthToken };
+            } else {
+                // Normal Login Flow
+                const res = await API.post('/auth/login', { email, password });
+                data = res.data;
+                localStorage.setItem('token', data.token);
+            }
+
             localStorage.setItem('user', JSON.stringify(data));
             setUser(data);
             return { success: true };
         } catch (error) {
+            console.error(error);
             return {
                 success: false,
                 message: error.response?.data?.message || 'Login failed'
@@ -33,6 +48,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const { data } = await API.post('/auth/register', { name, email, password, role });
             localStorage.setItem('user', JSON.stringify(data));
+            localStorage.setItem('token', data.token);
             setUser(data);
             return { success: true };
         } catch (error) {
@@ -45,6 +61,7 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
         setUser(null);
     };
 

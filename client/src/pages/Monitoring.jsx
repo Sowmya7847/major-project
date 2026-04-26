@@ -1,22 +1,53 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Activity, Shield, AlertTriangle, CheckCircle, Download, Search, Filter, Lock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { cn } from '../lib/utils';
+import API from '../services/api';
 
 const Monitoring = () => {
-    // Mock Data for Charts
-    const trafficData = Array.from({ length: 20 }).map((_, i) => ({
-        time: `${i}:00`,
-        value: 10 + Math.random() * 50 + (i > 15 ? 40 : 0) // Spike at end
-    }));
+    const [auditLogs, setAuditLogs] = useState([]);
+    const [metrics, setMetrics] = useState({
+        trafficData: Array.from({ length: 24 }).map((_, i) => ({ time: `${i}:00`, value: 0 })),
+        throughput: 0,
+        throughputData: [0, 0, 0, 0, 0, 0, 0],
+        anomalyScore: 0,
+        anomalyStatus: 'Low'
+    });
+    const [loading, setLoading] = useState(true);
 
-    const auditLogs = [
-        { id: 1, time: '2023-10-27 14:23:01', severity: 'critical', type: 'Auth_Failure', node: 'US-East-1-N4', msg: 'Multiple failed login attempts detected from IP 192.168.x.x' },
-        { id: 2, time: '2023-10-27 14:18:45', severity: 'warning', type: 'Latency_Spike', node: 'EU-West-2-N1', msg: 'Encryption module response time > 200ms' },
-        { id: 3, time: '2023-10-27 14:15:22', severity: 'success', type: 'Key_Rotation', node: 'System_Global', msg: 'Scheduled AES-256 key rotation completed successfully.' },
-        { id: 4, time: '2023-10-27 14:10:05', severity: 'info', type: 'User_Login', node: 'US-East-1-Gateway', msg: 'User admin_security session started.' },
-        { id: 5, time: '2023-10-27 14:08:12', severity: 'info', type: 'Config_Update', node: 'US-East-1-N2', msg: 'Firewall rule set updated via Admin Policy.' },
-    ];
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [logsRes, metricsRes] = await Promise.all([
+                    API.get('/security/logs?limit=10'),
+                    API.get('/analytics')
+                ]);
+
+                // Logs
+                const formattedLogs = logsRes.data.map(log => ({
+                    id: log._id,
+                    time: new Date(log.timestamp).toLocaleString(),
+                    severity: log.severity,
+                    type: log.eventType,
+                    node: log.node || 'System_Global',
+                    msg: log.message
+                }));
+                setAuditLogs(formattedLogs);
+
+                // Metrics
+                setMetrics(metricsRes.data);
+
+            } catch (error) {
+                console.error("Failed to fetch monitoring data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        const interval = setInterval(fetchData, 5000); // Real-time polling
+        return () => clearInterval(interval);
+    }, []);
 
     const getSeverityStyles = (sev) => {
         switch (sev) {
@@ -50,15 +81,17 @@ const Monitoring = () => {
                         <div>
                             <h3 className="text-gray-400 text-sm font-medium">Access Attempts (24h)</h3>
                             <div className="flex items-baseline gap-2 mt-1">
-                                <span className="text-3xl font-bold text-white">12,450</span>
-                                <span className="text-success text-xs font-bold bg-success/10 px-1.5 py-0.5 rounded">↗ 12%</span>
+                                <span className="text-3xl font-bold text-white">
+                                    {metrics.trafficData.reduce((a, b) => a + b.value, 0)}
+                                </span>
+                                <span className="text-success text-xs font-bold bg-success/10 px-1.5 py-0.5 rounded">Live</span>
                             </div>
                         </div>
                         <div className="p-2 bg-gray-900 rounded-lg"><Activity size={18} className="text-gray-400" /></div>
                     </div>
                     <div className="h-32 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={trafficData}>
+                            <AreaChart data={metrics.trafficData}>
                                 <defs>
                                     <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#FF3D3D" stopOpacity={0.3} />
@@ -77,16 +110,15 @@ const Monitoring = () => {
                         <div>
                             <h3 className="text-gray-400 text-sm font-medium">Encryption Throughput</h3>
                             <div className="flex items-baseline gap-2 mt-1">
-                                <span className="text-3xl font-bold text-white">450</span>
-                                <span className="text-sm text-gray-500">MB/s</span>
-                                <span className="text-success text-xs font-bold bg-success/10 px-1.5 py-0.5 rounded">↗ 5%</span>
+                                <span className="text-3xl font-bold text-white">{metrics.throughput}</span>
+                                <span className="text-sm text-gray-500">Mbps</span>
                             </div>
                         </div>
                         <div className="p-2 bg-gray-900 rounded-lg"><Shield size={18} className="text-gray-400" /></div>
                     </div>
                     <div className="h-32 flex items-end justify-between gap-1 px-2">
-                        {[40, 60, 30, 80, 100, 50, 45].map((h, i) => (
-                            <div key={i} style={{ height: `${h}%` }} className={cn("w-full rounded-t-sm", i === 4 ? "bg-primary shadow-[0_0_10px_#00E5FF]" : "bg-gray-800")}></div>
+                        {metrics.throughputData.map((h, i) => (
+                            <div key={i} style={{ height: `${h}%` }} className={cn("w-full rounded-t-sm", i === metrics.throughputData.length - 1 ? "bg-primary shadow-[0_0_10px_#00E5FF]" : "bg-gray-800")}></div>
                         ))}
                     </div>
                 </div>
@@ -97,9 +129,10 @@ const Monitoring = () => {
                         <div>
                             <h3 className="text-gray-400 text-sm font-medium">Anomaly Detection Score</h3>
                             <div className="flex items-baseline gap-2 mt-1">
-                                <span className="text-4xl font-bold text-white">2</span>
-                                <span className="text-xl font-bold text-danger">Critical</span>
-                                <span className="text-danger text-xs font-bold bg-danger/10 px-1.5 py-0.5 rounded">+2 detected</span>
+                                <span className="text-4xl font-bold text-white">{metrics.anomalyScore}</span>
+                                <span className={cn("text-xl font-bold", metrics.anomalyStatus === 'High' ? "text-danger" : "text-success")}>
+                                    {metrics.anomalyStatus}
+                                </span>
                             </div>
                         </div>
                         <div className="p-2 bg-danger/10 rounded-lg border border-danger/20 animate-pulse">
@@ -120,7 +153,7 @@ const Monitoring = () => {
                             <div className="w-1/3 bg-danger/30"></div>
                         </div>
                         <div className="relative h-2 mt-[-8px]">
-                            <div className="absolute right-0 top-0 w-full h-full bg-gradient-to-r from-transparent via-transparent to-danger rounded-r-full"></div>
+                            <div className="absolute right-0 top-0 h-full bg-gray-900" style={{ width: `${100 - Math.min(100, metrics.anomalyScore * 5)}%` }}></div>
                         </div>
                     </div>
                     <p className="text-xs text-gray-500 mt-4">Last anomaly: <strong>IP 192.168.1.45</strong> (Unauthorized access)</p>

@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import { Shield, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
@@ -10,6 +10,15 @@ const Login = () => {
     const [error, setError] = useState('');
     const { login } = useContext(AuthContext);
     const navigate = useNavigate();
+
+    // Handle OAuth Redirect
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (token) {
+            login(null, null, token); // We need to update login function in AuthContext to accept token
+        }
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -113,17 +122,17 @@ const Login = () => {
                 </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-3">
-                    <button className="flex items-center justify-center px-4 py-2 border border-gray-700 rounded-lg hover:bg-surfaceHover transition-colors text-sm text-gray-300 gap-2">
+                    <a href="http://localhost:4000/api/auth/google" className="flex items-center justify-center px-4 py-2 border border-gray-700 rounded-lg hover:bg-surfaceHover transition-colors text-sm text-gray-300 gap-2">
                         <div className="w-4 h-4 rounded-full bg-gradient-to-br from-red-500 to-yellow-500"></div> Google
-                    </button>
-                    <button className="flex items-center justify-center px-4 py-2 border border-gray-700 rounded-lg hover:bg-surfaceHover transition-colors text-sm text-gray-300 gap-2">
+                    </a>
+                    <a href="http://localhost:4000/api/auth/microsoft" className="flex items-center justify-center px-4 py-2 border border-gray-700 rounded-lg hover:bg-surfaceHover transition-colors text-sm text-gray-300 gap-2">
                         <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
                             <div className="bg-red-500 text-[0px]">.</div>
                             <div className="bg-green-500 text-[0px]">.</div>
                             <div className="bg-blue-500 text-[0px]">.</div>
                             <div className="bg-yellow-500 text-[0px]">.</div>
                         </div> Microsoft
-                    </button>
+                    </a>
                 </div>
 
                 <div className="mt-8 text-center">
