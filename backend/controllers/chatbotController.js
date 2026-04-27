@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
-const { getChatResponse } = require('../services/geminiService');
+const { getChatResponse, getLocalFallbackStream } = require('../services/geminiService');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const AuditLog = require('../models/AuditLog');
 const VirtualNode = require('../models/VirtualNode');
 const FileRecord = require('../models/FileRecord');
@@ -147,4 +148,106 @@ const getSuggestions = asyncHandler(async (req, res) => {
     res.json({ suggestions: suggestions.slice(0, 5) });
 });
 
-module.exports = { processChat, getSuggestions };
+// @desc    Stream chatbot response via SSE (Server-Sent Events)
+// @route   POST /api/chatbot/stream
+// @access  Private
+const streamChat = async (req, res) => {
+    const { message, history } = req.body;
+
+    if (!message) {
+        res.status(400).json({ error: 'Message required' });
+        return;
+    }
+
+    // SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+
+    const sendChunk = (text) => res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+    const sendDone = () => res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    const sendError = (msg) => res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+
+    try {
+        const [activeNodes, totalNodes, userFiles, criticalAlerts, activeKeys] = await Promise.all([
+            VirtualNode.countDocuments({ status: 'active' }),
+            VirtualNode.countDocuments(),
+            FileRecord.countDocuments({ user: req.user._id }),
+            AuditLog.countDocuments({ severity: 'critical' }),
+            Key.countDocuments({ user: req.user._id, isActive: true })
+        ]);
+
+        const systemContext = { userName: req.user.name, userRole: req.user.role, userFiles, activeNodes, totalNodes, criticalAlerts, activeKeys };
+
+        if (!process.env.GEMINI_API_KEY) {
+            // Stream fallback response word-by-word
+            const fallbackText = require('../services/geminiService').localFallback(message, systemContext);
+            const words = fallbackText.split(' ');
+            for (let i = 0; i < words.length; i++) {
+                sendChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+                await new Promise(r => setTimeout(r, 18));
+            }
+            sendDone();
+            res.end();
+            return;
+        }
+
+        const enhancedMessage = `[Live Context: User=${req.user.name}, Role=${req.user.role}, Files=${userFiles}, ActiveKeys=${activeKeys}, Nodes=${activeNodes}/${totalNodes}, CriticalAlerts=${criticalAlerts}]\n\nUser: ${message}`;
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-1.5-flash',
+            systemInstruction: {
+                parts: [{ text: 'You are SecureCloud AI, a highly intelligent security assistant. Answer questions about cloud security, encryption (AES-256-GCM, CP-ABE, ChaCha20), distributed storage, key management, HMAC, audit logs, and compliance (GDPR, SOC2, HIPAA). Use markdown with headers, tables, and code blocks. Be professional and concise.' }]
+            }
+        });
+
+        const chat = model.startChat({
+            history: (history || [])
+                .filter(h => h.role && h.content)
+                .map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }))
+        });
+
+        const result = await chat.sendMessageStream(enhancedMessage);
+
+        for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (text) sendChunk(text);
+        }
+
+        // Log
+        AuditLog.create({
+            eventType: 'AI_CHAT_STREAM',
+            user: req.user._id,
+            severity: 'info',
+            message: `Streamed AI response to ${req.user.name}`,
+            metadata: { query: message.substring(0, 200) }
+        }).catch(() => {});
+
+        sendDone();
+        res.end();
+
+    } catch (error) {
+        console.error('Stream error:', error.message);
+        // Fall back to word-by-word local response
+        try {
+            const { localFallback } = require('../services/geminiService');
+            const systemContext = { userName: req.user.name, userRole: req.user.role, userFiles: 0, activeNodes: 0, totalNodes: 0, criticalAlerts: 0, activeKeys: 0 };
+            const fallbackText = localFallback(message, systemContext);
+            const words = fallbackText.split(' ');
+            for (let i = 0; i < words.length; i++) {
+                sendChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+                await new Promise(r => setTimeout(r, 18));
+            }
+            sendDone();
+        } catch {
+            sendError('AI service temporarily unavailable.');
+            sendDone();
+        }
+        res.end();
+    }
+};
+
+module.exports = { processChat, getSuggestions, streamChat };

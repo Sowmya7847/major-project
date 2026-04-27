@@ -194,4 +194,4 @@ const getSecurityRecommendations = async (systemData = {}) => {
     }
 };
 
-module.exports = { analyzeFileRisk, getChatResponse, summarizeLogs, getSecurityRecommendations };
+module.exports = { analyzeFileRisk, getChatResponse, summarizeLogs, getSecurityRecommendations, localFallback };
