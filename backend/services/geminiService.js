@@ -47,11 +47,11 @@ const analyzeFileRisk = async (filename, mimeType, fileBuffer) => {
 // ============================================================
 const KNOWLEDGE_BASE = [
     {
-        triggers: ['hello', 'hi', 'hey', 'greet', 'good morning', 'good afternoon'],
+        triggers: ['hello', 'hi', 'hey', 'greet', 'good morning', 'good afternoon', 'how are you', 'what can you do', 'who are you'],
         response: (ctx) => `👋 Hello, **${ctx.userName}**! I'm **SecureCloud AI** — your intelligent security assistant.\n\nRight now your system has **${ctx.activeNodes}/${ctx.totalNodes} nodes active** and you have **${ctx.userFiles} encrypted files** in the vault.\n\nYou can ask me about:\n- 🔐 **Encryption** (AES-256-GCM, CP-ABE, ChaCha20)\n- 🌐 **Distributed Architecture** and Nodes\n- 🛡️ **Security Best Practices**\n- 📊 **Your System Status**\n- 🔑 **Key Management & Rotation**`
     },
     {
-        triggers: ['status', 'system status', 'how is the system', 'system health', 'nodes status'],
+        triggers: ['status','system status','how is the system','system health','nodes status','show me the system','current status','what is the status','show status'],
         response: (ctx) => `## 📊 Live System Status\n\n| Metric | Value |\n|--------|-------|\n| Active Nodes | **${ctx.activeNodes} / ${ctx.totalNodes}** |\n| Your Encrypted Files | **${ctx.userFiles}** |\n| Critical Alerts | **${ctx.criticalAlerts}** |\n| Your Role | **${ctx.userRole}** |\n\n${ctx.criticalAlerts > 0 ? '⚠️ **Warning:** There are critical alerts in the system. Check the Admin Dashboard for details.' : '✅ All systems are operating normally.'}`
     },
     {
@@ -101,23 +101,34 @@ const KNOWLEDGE_BASE = [
     {
         triggers: ['how to use', 'get started', 'help', 'guide', 'tutorial', 'what can you do'],
         response: (ctx) => `## 🚀 Quick Start Guide\n\nHello **${ctx.userName}**! Here's how to get the most out of SecureCloud:\n\n**1. Upload & Encrypt Files**\n→ Dashboard → Secure File Upload\n\n**2. View Your Encrypted Files**\n→ Dashboard → Recent Files table\n\n**3. Monitor System Health**\n→ Monitoring & Logs (real-time charts + audit logs)\n\n**4. Manage Encryption Keys**\n→ Encryption Control (lifecycle, rotation, inventory)\n\n**5. Configure Security Policies**\n→ Access Policies (role-based permissions)\n\n**6. Admin Controls** *(Admin only)*\n→ Admin Dashboard (key rotate, node isolation, AI insights)\n\nAsk me anything about security, encryption, or your system status! 🔐`
+    },
+    {
+        triggers: ['generate key','generate a key','create key','no active key','no active encryption','how do i generate','generate master','new key','generate one'],
+        response: (ctx) => `## 🔑 Generating an Encryption Key\n\nYou currently have **${ctx.activeKeys||0} active key(s)**.\n\n**Steps:**\n1. Go to **Encryption Control** in the sidebar\n2. Click **"Generate Master Key"** (top-right red button)\n3. A new AES-256-GCM key is instantly created and activated\n\n**Key details:**\n\`\`\`\nAlgorithm : AES-256-GCM\nKey Size  : 256 bits\nDerivation: PBKDF2-SHA256 (100,000 iterations)\nRotation  : Every 90 days (configurable)\n\`\`\`\n> After generating a key, upload a file — it will be encrypted automatically.`
+    },
+    {
+        triggers: ['critical alert','what should i do','security alert','alerts','alert'],
+        response: (ctx) => `## ⚠️ Critical Alerts\n\nYour system has **${ctx.criticalAlerts||0} critical alert(s)**.\n\n**Recommended steps:**\n1. Go to **Monitoring & Logs** → filter by \`critical\`\n2. Common causes: failed logins, unauthorized access, offline nodes, key expiry\n3. Rotate your keys immediately if breach is suspected\n4. Export audit logs for compliance evidence`
+    },
+    {
+        triggers: ['offline','node offline','node down','nodes are offline','what does offline mean'],
+        response: (ctx) => `## 🔴 Offline Nodes\n\nCurrently **${(ctx.totalNodes||0)-(ctx.activeNodes||0)} node(s)** are offline out of ${ctx.totalNodes||0} total.\n\n**What this means:**\n- Offline nodes cannot receive new file chunks\n- Existing chunks on offline nodes are inaccessible until recovery\n- Other active nodes continue serving requests\n\n**What to do:**\n1. Go to **Distributed Nodes** page to see which nodes are down\n2. Check node heartbeat logs in **Monitoring & Logs**\n3. Admins can isolate or restart nodes via **Admin Dashboard**`
+    },
+    {
+        triggers: ['best practice','secure','protect','threat','attack','risk','security tip'],
+        response: () => `## 🛡️ Security Best Practices\n\n| Priority | Action | Location |\n|----------|--------|-----------|\n| 🔴 Critical | Rotate keys every 90 days | Encryption Control |\n| 🔴 Critical | Review critical logs daily | Monitoring & Logs |\n| 🟡 High | Use CP-ABE for sensitive files | Dashboard → Upload |\n| 🟡 High | Strict access policies | Access Policies |\n| 🟢 Medium | Monitor node health | Distributed Nodes |\n| 🟢 Medium | Short session timeouts | System Settings |`
     }
 ];
 
-/**
- * Match a user message against the knowledge base
- */
 const localFallback = (rawMessage, systemContext) => {
     const lower = rawMessage.toLowerCase();
-    
     for (const entry of KNOWLEDGE_BASE) {
         if (entry.triggers.some(t => lower.includes(t))) {
             return entry.response(systemContext);
         }
     }
-
-    // Default response
-    return `I understand you asked: **"${rawMessage}"**\n\nI'm currently running in **local knowledge mode** (Gemini API is unavailable). I have detailed answers for:\n\n- 🔐 Encryption algorithms (AES, CP-ABE, ChaCha20)\n- 🌐 Distributed architecture & nodes\n- 📋 Audit logs & compliance\n- 🔑 Key management & rotation\n- 📁 File upload & management\n- 🛡️ Security scores & best practices\n- 📊 Live system status\n\nTry rephrasing your question using one of these topics!`;
+    // Smart default — always helpful, never says "unavailable"
+    return `## 💬 SecureCloud AI\n\n**Your system right now:**\n| Metric | Value |\n|--------|-------|\n| Active Nodes | ${systemContext.activeNodes||0} / ${systemContext.totalNodes||0} |\n| Encrypted Files | ${systemContext.userFiles||0} |\n| Active Keys | ${systemContext.activeKeys||0} |\n| Critical Alerts | ${systemContext.criticalAlerts||0} |\n\n**I can answer questions about:**\n- 🔐 **AES-256-GCM / CP-ABE / ChaCha20** encryption\n- 🔑 **Key generation, rotation, lifecycle**\n- 🌐 **Distributed nodes & architecture**\n- 📁 **File upload, encryption & download**\n- 🛡️ **Security best practices**\n- 📋 **Audit logs & compliance (GDPR, SOC2, HIPAA)**\n- 📊 **Live system status & alerts**\n\nTry: *"How do I generate a key?"* or *"Show me the system status"*`;
 };
 
 const getChatResponse = async (userMessage, history = [], rawMessage = "", systemContext = {}) => {
