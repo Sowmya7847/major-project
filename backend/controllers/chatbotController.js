@@ -3,37 +3,57 @@ const { getChatResponse } = require('../services/geminiService');
 const AuditLog = require('../models/AuditLog');
 const VirtualNode = require('../models/VirtualNode');
 const FileRecord = require('../models/FileRecord');
+const Key = require('../models/Key');
 
 /**
  * COMPREHENSIVE PROJECT KNOWLEDGE BASE
- * This context is injected into every AI request to ensure it can answer 
- * questions about any part of the SecureCloud project.
+ * Injected into every AI request for context-aware responses.
  */
 const PROJECT_CONTEXT = `
-PROJET ARCHITECTURE & COMPONENTS:
-1. API Gateway (Port 4000): The entry point. Handles routing, rate limiting, and WebSockets (Socket.io) for real-time metrics. Proxies requests to Backend and ML services.
-2. Backend Service (Port 5000): Core logic. Handles User Auth, Key Management, Node Management, and database interactions (MongoDB).
-3. ML Service (Port 5001 - Fast API/Simulated): Analyzes file features (entropy, headers, size) for threat detection and anomaly scoring.
-4. Workers (Distributed): Individual nodes that perform the actual encryption/decryption and chunked storage. They communicate with the Gateway via heartbeats.
+SECURECLOUD DISTRIBUTED SYSTEM — FULL PROJECT KNOWLEDGE BASE:
 
-KEY SECURITY FIELDS & CONCEPTS:
-- Encryption Schemes: 
-  * AES-256-GCM: Standard high-performance symmetric encryption.
-  * CP-ABE (Ciphertext-Policy Attribute-Based Encryption): Advanced role-based encryption where policies (e.g., "Role:admin") are embedded in the ciphertext.
-- Distributed Storage: Files are split into "Chunks" and distributed across multiple "Virtual Nodes" for redundancy and security.
-- Audit Logging: Every sensitive action (upload, download, re-login) is logged in the AuditLog model with severity levels (info, warning, critical).
-- HMAC Verification: Ensures data integrity during transmission and storage.
-- Key Rotation: Policies for rotating encryption keys to minimize impact of potential leaks.
+ARCHITECTURE:
+1. API Gateway (Port 4000): Single entry point. Handles routing, rate limiting, WebSockets (Socket.io) for real-time metrics. Proxies all requests to Backend and ML Service.
+2. Backend Service (Port 5000): Core logic — User Auth (JWT + bcrypt), Key Management, File/Node/Role Management, MongoDB interactions.
+3. ML Service (Port 5001 — FastAPI + scikit-learn): Analyzes file features (entropy, MIME type, size) for threat detection and anomaly scoring using a pre-trained IDS model.
+4. Worker Nodes (Distributed — Node.js): Perform actual AES-256-GCM encryption/decryption and chunked storage. Register via heartbeats to Gateway.
+
+ENCRYPTION SCHEMES SUPPORTED:
+- AES-256-GCM: High-performance, NIST-approved, authenticated encryption. Default scheme.
+- CP-ABE (Ciphertext-Policy Attribute-Based Encryption): Policy embedded in ciphertext. Users must satisfy policy (e.g., "Role:Admin AND Dept:Finance") to decrypt. Implemented via custom JavaScript simulation.
+- ChaCha20-Poly1305: Available via config. Preferred on hardware without AES-NI acceleration.
+
+SECURITY FEATURES:
+- HMAC-SHA256 verification on every file chunk
+- Key rotation with configurable interval (default 90 days)
+- Immutable audit logs with severity levels (info/warning/critical)
+- ML-based threat detection on file uploads (entropy, signature scanning)
+- Rate limiting on all API endpoints
+- Session-based JWT authentication
+- Role-based access control (user/admin/auditor)
+
+COMPLIANCE: GDPR, SOC2 Type II, HIPAA, FIPS 140-2, ISO 27001
 
 DATA MODELS:
-- User: name, email, password, role (user, admin, auditor), securityScore.
-- FileRecord: originalName, size, chunks[], encryptionScheme, accessPolicy, status (pending, processing, encrypted).
-- VirtualNode: nodeId, name, url, status (active, inactive), load, latencyMs.
-- AuditLog: eventType, user, message, severity, timestamp.
-- Key: keyMaterial, algorithm, version, status.
+- User: name, email, password (bcrypt), role, department, securityScore
+- FileRecord: originalName, size, chunks[], encryptionScheme, accessPolicy, status, geminiAnalysis (riskScore, summary, threats)
+- VirtualNode: nodeId, name, url, status (active/inactive), load, latencyMs, storageUsed
+- AuditLog: eventType, user, message, severity, timestamp, metadata
+- Key: keyMaterial, algorithm, isActive, status (active/rotated/revoked), expiryDate
+- SecurityConfig: encryptionMode, chunkSize, parallelismLevel, workerCount, keyRotationInterval, sessionTimeout
+
+PAGES & NAVIGATION:
+- Dashboard: File upload (AES-GCM / CP-ABE), encrypted file list with AI risk scores
+- Encryption Control: Key lifecycle, generation, rotation, inventory table, usage heatmap
+- Data Security: Live encryption preview, toggle HMAC/E2E/auto-rotation, compliance check
+- Distributed Nodes: Real-time node health grid with storage, latency, load metrics
+- Monitoring & Logs: Recharts graphs (traffic, throughput), anomaly score gauge, audit log table
+- Admin Dashboard: Node map, key controls, AI insights, Gemini recommendations
+- Access Policies: Role-based permission matrix with JSON policy viewer
+- System Config: Encryption mode, parallelism, session timeout, worker count
 `;
 
-// @desc    Process chatbot message
+// @desc    Process chatbot message with full dynamic context
 // @route   POST /api/chatbot
 // @access  Private
 const processChat = asyncHandler(async (req, res) => {
@@ -44,41 +64,87 @@ const processChat = asyncHandler(async (req, res) => {
         throw new Error('Please provide a message');
     }
 
-    // Fetch real-time system stats
-    const activeNodes = await VirtualNode.countDocuments({ status: 'active' });
-    const totalNodes = await VirtualNode.countDocuments();
-    const userFiles = await FileRecord.countDocuments({ user: req.user._id });
+    // Fetch real-time system stats concurrently
+    const [activeNodes, totalNodes, userFiles, criticalAlerts, activeKeys] = await Promise.all([
+        VirtualNode.countDocuments({ status: 'active' }),
+        VirtualNode.countDocuments(),
+        FileRecord.countDocuments({ user: req.user._id }),
+        AuditLog.countDocuments({ severity: 'critical' }),
+        Key.countDocuments({ user: req.user._id, isActive: true })
+    ]);
 
-    // Build the dynamic and knowledge-rich prompt
-    const systemContext = `
+    const systemContext = {
+        userName: req.user.name,
+        userRole: req.user.role,
+        userFiles,
+        activeNodes,
+        totalNodes,
+        criticalAlerts,
+        activeKeys
+    };
+
+    // Build rich, structured prompt for AI
+    const enhancedMessage = `[SECURECLOUD KNOWLEDGE BASE & REAL-TIME STATUS]
 ${PROJECT_CONTEXT}
-CURRENT USER CONTEXT:
-- Name: ${req.user.name}
-- Role: ${req.user.role}
-- Current Session Stats: ${userFiles} files uploaded by you.
-SYSTEM REAL-TIME STATUS:
-- Distributed Nodes: ${activeNodes} active out of ${totalNodes} total.
-`;
 
-    const enhancedMessage = `[Knowledge Base & Status: ${systemContext}] User Request: ${message}`;
+LIVE SYSTEM DATA:
+- Logged-in User: ${req.user.name} (Role: ${req.user.role}, Dept: ${req.user.department || 'N/A'})
+- User's Encrypted Files: ${userFiles}
+- User's Active Keys: ${activeKeys}
+- Network: ${activeNodes}/${totalNodes} nodes active
+- Critical Security Alerts: ${criticalAlerts}
 
-    const aiResponse = await getChatResponse(enhancedMessage, history || [], message);
+USER'S QUESTION: ${message}`;
 
-    // Log AI interactions
+    const aiResponse = await getChatResponse(enhancedMessage, history || [], message, systemContext);
+
+    // Log the interaction
     await AuditLog.create({
         eventType: 'AI_CHAT_INTERACTION',
         user: req.user._id,
         severity: 'info',
-        message: `User ${req.user.name} queried the AI assistant`,
+        message: `AI chatbot query by ${req.user.name}`,
         metadata: {
-            query: message.substring(0, 100),
-            nodesActive: activeNodes
+            query: message.substring(0, 200),
+            nodesActive: activeNodes,
+            responseLength: aiResponse.length
         }
     });
 
     res.status(200).json({
-        response: aiResponse
+        response: aiResponse,
+        context: {
+            activeNodes,
+            totalNodes,
+            userFiles,
+            criticalAlerts
+        }
     });
 });
 
-module.exports = { processChat };
+// @desc    Get suggested questions based on system state
+// @route   GET /api/chatbot/suggestions
+// @access  Private
+const getSuggestions = asyncHandler(async (req, res) => {
+    const criticalAlerts = await AuditLog.countDocuments({ severity: 'critical' });
+    const totalNodes = await VirtualNode.countDocuments();
+    const activeNodes = await VirtualNode.countDocuments({ status: 'active' });
+    const userFiles = await FileRecord.countDocuments({ user: req.user._id });
+    const activeKeys = await Key.countDocuments({ user: req.user._id, isActive: true });
+
+    const suggestions = [
+        "What is the current system status?",
+        "How does AES-256-GCM encryption work?",
+        "Explain CP-ABE and how to set an access policy",
+        "How do I rotate my encryption keys?",
+    ];
+
+    if (criticalAlerts > 0) suggestions.unshift(`⚠️ There are ${criticalAlerts} critical alerts — what should I do?`);
+    if (activeNodes < totalNodes) suggestions.unshift(`🔴 ${totalNodes - activeNodes} node(s) are offline — what does that mean?`);
+    if (userFiles === 0) suggestions.unshift("How do I upload and encrypt my first file?");
+    if (activeKeys === 0) suggestions.unshift("I have no active encryption keys — how do I generate one?");
+
+    res.json({ suggestions: suggestions.slice(0, 5) });
+});
+
+module.exports = { processChat, getSuggestions };
