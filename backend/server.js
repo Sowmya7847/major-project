@@ -97,6 +97,10 @@ const startServer = async () => {
         console.log('[BACKEND] Initializing Nodes...');
         await initNodes();
 
+        // Run Seeder
+        const seedData = require('./utils/seeder');
+        await seedData();
+
         console.log('[BACKEND] Starting listener...');
         app.listen(PORT, () => {
             console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
